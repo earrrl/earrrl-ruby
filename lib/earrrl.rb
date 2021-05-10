@@ -5,11 +5,9 @@ require_relative "earrrl/version"
 class Earrrl
   class Error < StandardError; end
 
-  # TODO! change the params here
   EARRRL_SCRIPT = <<~LUA
     -- parameters and state
     local lambda = %{lambda}
-    local rate_limit = %{rate_limit}
     local time_array = redis.call("time")
     local now = time_array[1]+0.000001*time_array[2] -- seconds + microseconds
 
@@ -21,49 +19,31 @@ class Earrrl
         T = flat_NT[4]
     end
     if N == 0.0 and T == 0.0 and #flat_NT > 0 then
-        -- something is wrong with this key, just delete it and start over
+        -- something is wrong with this key (otherwiser N and T would be non-zero by now), just delete it and start over
         redis.call("del", KEYS[1]) -- TODO! test
     end
     
-    -- TODO! pull in lambda
-    local exp_lambda_del_t = math.exp(lambda * (T - now))
+    -- prepare
+    local n_exp_lambda_del_t = N*math.exp(lambda * (T - now))
 
-    
-    -- functions
+    -- evaluate
+    local estimated_rate = lambda*n_exp_lambda_del_t
 
-    local function evaluate()
-      return N*lambda*exp_lambda_del_t
+    -- update
+    if ARGV[1] ~= 0 then
+      redis.call("hset", KEYS[1], "N", ARGV[1] + n_exp_lambda_del_t, "T", now)
     end
     
-    local function update()
-      redis.call("hset", KEYS[1], "N", ARGV[1] + N * exp_lambda_del_t, "T", now)
-    end
-    
-    local function is_rate_limited()
-      local estimated_rate = evaluate()
-      update()
-      return tostring(estimated_rate) -- TODO! can I remove tostring ?
-    end
-    
-
-    -- the whole big show
-
-    return is_rate_limited()
-    -- TODO! remove all function calls and just make a script (removes pointer dereferences and makes script tiny bit faster)
+    return tostring(estimated_rate)
   LUA
 
-  #TODO! delete
-  # EARRRL_SCRIPT = <<~LUA
-  #   return ARGV[1]+1
-  # LUA
-
-  attr_accessor :redis, :earrrl_hash #TODO! delete
-
-  def initialize(redis_instance, lambda: nil, half_life: nil, rate_limit: nil)
-    #TODO! add key prefix
+  def initialize(redis_instance, prefix, lambda: nil, half_life: nil, rate_limit: nil)
     # you may specify lambda or half_life but not both
     if (lambda && half_life) || (!lambda && !half_life)
       raise Exception.new "one of lambda or half_life must be specified"
+    end
+    if !prefix.is_a? String
+      raise Exception.new "prefix must be a String"
     end
     if lambda && lambda <= 0.0
       raise Exception.new "lambda must be greater than 0.0"
@@ -75,34 +55,34 @@ class Earrrl
       raise Exception.new "rate_limit must be greater than 0.0"
     end
     @redis = redis_instance
+    @prefix = prefix
     @lambda = lambda
     @lambda = Math.log(2)/half_life if half_life
     @rate_limit = rate_limit
 
+    script = EARRRL_SCRIPT % {lambda:lambda}
     # TODO! how in ruby do we ensure that this script is only registered once? How do we prevent someone from misunderstanding and creating a new EARRRL instance every time they want to use it
-    script = EARRRL_SCRIPT % {lambda:lambda, rate_limit:rate_limit||0.0}
     @earrrl_hash = @redis.script "load", script
   end
 
-
-  # returns estimated rate prior to this update and updates the estimator with this request amount
+  # returns the estimated rate before updating the state and then updates the state
   # if not specified, this update amount defaults to 1
-  def update(key, amount)
-    resp = @redis.evalsha(@earrrl_hash,[key], [amount])
-    puts "RESPONSE #{resp}"
-    return resp
+  # if update amount is 0 then the state is not updated
+  def update_and_return_rate(key, amount=1)
+    rate = @redis.evalsha(@earrrl_hash,["#{@prefix}:#{key}"], [amount])
+    return rate.to_f
   end
 
-  #TODO! functions to add
-  # * rate_limited?(key) returns the rate_limited? but doesn't update anything (errors if rate_limit wasnt set)
-  # * before_update_rate_limited?(key, update=1) returns the rate_limited? evaluated before updated and then updates (errors if rate_limit wasnt set)
-  # * get_rate_estimate(key) returns the rate estimate but doesn't update anything
-  # * before_update_get_rate_estimate(key) returns the rate estimate but doesn't update anything and then updates
+  # returns whether or not this key is rate limited based on the estimated rate before updating the state and then updates the state
+  # if not specified, this update amount defaults to 1
+  # if update amount is 0 then the state is not updated
+  # if rate_limit was not specified at initialization then this raises an exception
+  def update_and_rate_limited?(key, amount=1)
+    if !@rate_limit
+      raise Exception.new "rate limit was not specified when Earrrl was initialized"
+    end
+    rate = update_and_return_rate(key, amount)
+    return rate.to_f > @rate_limit
+  end
 
-
-  # TODO! do we need cleanup methods like delete key or delete all keys?
 end
-
-
-# TODO! delete
-#  require "earrrl";require "redis";e = Earrrl.new(Redis.new, lambda:0.07); e.update("asdf", 1)
