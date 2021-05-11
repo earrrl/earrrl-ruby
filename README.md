@@ -1,8 +1,8 @@
 # Earrrl::Ruby
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/earrrl/ruby`. To experiment with that code, run `bin/console` for an interactive prompt.
-
-TODO: Delete this and the text above, and describe your gem
+EARRRL is the Estimated Average Recent Request Rate Limiter as described in these blog posts:
+* [EARRRL – the Estimated Average Recent Request Rate Limiter](http://blog.jnbrymn.com/2021/03/18/estimated-average-recent-request-rate-limiter.html)
+* [EARRRL – the Estimated Average Recent Request Rate Limiter - the Mathy Bits](http://blog.jnbrymn.com/2021/03/18/estimated-average-recent-request-rate-limiter-math.html)
 
 ## Installation
 

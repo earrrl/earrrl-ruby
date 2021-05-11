@@ -60,7 +60,7 @@ class Earrrl
     @lambda = Math.log(2)/half_life if half_life
     @rate_limit = rate_limit
 
-    script = EARRRL_SCRIPT % {lambda:lambda}
+    script = EARRRL_SCRIPT % {lambda:@lambda}
     # TODO! how in ruby do we ensure that this script is only registered once? How do we prevent someone from misunderstanding and creating a new EARRRL instance every time they want to use it
     @earrrl_hash = @redis.script "load", script
   end
