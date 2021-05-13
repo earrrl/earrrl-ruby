@@ -11,14 +11,14 @@ class Earrrl
     local time_array = redis.call("time")
     local now = time_array[1]+0.000001*time_array[2] -- seconds + microseconds
 
-    local flat_NT = redis.call("hgetall",KEYS[1])
+    local flat_NT = redis.pcall("hgetall",KEYS[1])
     local N = 0.0
     local T = 0.0
     if #flat_NT == 4 and flat_NT[1] == "N" and flat_NT[3] == "T" then
         N = flat_NT[2]
         T = flat_NT[4]
     end
-    if N == 0.0 and T == 0.0 and #flat_NT > 0 then
+    if N == 0.0 and T == 0.0 and (flat_NT["err"] or #flat_NT > 0) then
         -- something is wrong with this key (otherwiser N and T would be non-zero by now), just delete it and start over
         redis.call("del", KEYS[1]) -- TODO! test
     end
