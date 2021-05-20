@@ -9,7 +9,7 @@ module Earrrl
     end
 
     def self.get_script_token
-      if !@script_token
+      if !defined? @script_token
         raise ScriptNotLoadedError, "script not loaded"
       end
       return @script_token
@@ -43,7 +43,19 @@ module Earrrl
     # if not specified, this update amount defaults to 1
     # if update amount is 0 then the state is not updated
     def update_and_return_rate(key, amount=1)
-      rate = @redis.evalsha(self.class.get_script_token,["#{@prefix}:#{key}"], [@epsilon, amount])
+      rate = nil
+
+      begin
+        rate = @redis.evalsha(self.class.get_script_token,["#{@prefix}:#{key}"], [@epsilon, amount])
+      rescue Redis::CommandError, ScriptNotLoadedError => e
+        if e.is_a?(ScriptNotLoadedError) || e.message =~ /NOSCRIPT/
+          Earrrl::ScriptLoader.load(@redis)
+          rate = @redis.evalsha(self.class.get_script_token,["#{@prefix}:#{key}"], [@epsilon, amount])
+        else
+          raise e
+        end
+      end
+
       return rate.to_f
     end
 
