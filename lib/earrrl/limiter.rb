@@ -4,7 +4,7 @@ module Earrrl
   class Limiter
     class ScriptNotLoadedError < StandardError; end
 
-    def self.load_script(redis)
+    def self.script_token(redis)
       if !defined? @script_token
         self.load_script!(redis)
       end
@@ -46,7 +46,7 @@ module Earrrl
       rate = nil
 
       begin
-        rate = @redis.evalsha(self.class.load_script(@redis),["#{@prefix}:#{key}"], [@epsilon, amount])
+        rate = @redis.evalsha(self.class.script_token(@redis), ["#{@prefix}:#{key}"], [@epsilon, amount])
       rescue Redis::CommandError => e
         if e.message =~ /NOSCRIPT/
           rate = @redis.evalsha(self.class.load_script!(@redis), ["#{@prefix}:#{key}"], [@epsilon, amount])
