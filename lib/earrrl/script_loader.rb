@@ -2,9 +2,6 @@
 
 
 module Earrrl
-
-
-
   class ScriptLoader
 
     EARRRL_SCRIPT = <<~LUA
