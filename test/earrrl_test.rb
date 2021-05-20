@@ -72,7 +72,7 @@ class EarrrlTest < Minitest::Test
   def test_redis_lost_script
     # this is so that we don't get a ScriptNotLoadedError, we intent to test redis NOSCRIPT error
     Earrrl::ScriptLoader.load(@redis)
-    @redis.script("flush","sync")
+    @redis.script("flush")
     earrrl = Earrrl::Limiter.new(@redis, @prefix, half_life:10, rate_limit: 100)
     estimated_rate = earrrl.update_and_return_rate("some_key", 1)
   end
