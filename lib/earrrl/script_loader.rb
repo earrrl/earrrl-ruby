@@ -2,6 +2,9 @@
 
 
 module Earrrl
+
+
+
   class ScriptLoader
 
     EARRRL_SCRIPT = <<~LUA
@@ -40,7 +43,7 @@ module Earrrl
     LUA
 
     def self.load(redis_instance)
-      Earrrl::Limiter.set_script_token(redis_instance.script "load", EARRRL_SCRIPT)
+      redis_instance.script "load", EARRRL_SCRIPT
     end
 
   end
