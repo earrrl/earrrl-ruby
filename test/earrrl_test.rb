@@ -41,6 +41,14 @@ class EarrrlTest < Minitest::Test
     assert(earrrl_state["T"].to_f > first_t, "almost not time has passed, but _some_ has so the most recent T should be larger than the first")
   end
 
+  def test_lua_script_allow_float_increments
+    earrrl = Earrrl::Limiter.new(@redis, @prefix, half_life:10)
+    key = "some_key"
+    estimated_rate = earrrl.update_and_return_rate(key, 1.5)
+    earrrl_state = @redis.hgetall("#{@prefix}:#{key}")
+    assert_equal(1.5, earrrl_state["N"].to_f, "the first update to N for the amount 1 should make N=1")
+  end
+
   # if the value stored at the key is of the wrong type, then delete it and start anew
   def test_lua_drop_bad_key
     earrrl = Earrrl::Limiter.new(@redis, @prefix, half_life:10)
@@ -71,8 +79,11 @@ class EarrrlTest < Minitest::Test
 
   def test_redis_lost_script
     # this is so that we don't get a ScriptNotLoadedError, we intent to test redis NOSCRIPT error
-    Earrrl::ScriptLoader.load(@redis)
+    script_token = Earrrl::ScriptLoader.load(@redis)
+    # now since Earrrl::Limit::script_token is populated we delete the script
     @redis.script("flush")
+    # prove that it doesn't exist
+    refute @redis.script("exists", script_token)
     earrrl = Earrrl::Limiter.new(@redis, @prefix, half_life:10, rate_limit: 100)
     estimated_rate = earrrl.update_and_return_rate("some_key", 1)
   end
